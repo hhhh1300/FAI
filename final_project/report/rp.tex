@@ -1,0 +1,171 @@
+\documentclass[11pt,a4paper]{article}
+% \documentclass{article}
+\usepackage{geometry}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{amsmath}
+\usepackage{graphics}
+\usepackage{epsfig}
+\makeatletter
+\def\BState{\State\hskip-\ALG@thistlm}
+\makeatother
+\graphicspath{ {./images/} }
+\lstset{
+    escapeinside={(*}{*)},
+}
+\lstdefinestyle{mystyle}{
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,  
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2
+}
+\lstset{style=mystyle}
+\geometry{
+    a4paper,
+    left=20mm,
+    right=20mm,
+    top=20mm,
+}
+
+\begin{document}
+\begin{center}
+    \section*{Report}
+\end{center}
+\section*{1. Counterfactual Regret Minimization}
+The first method I have tried is the CFR(Counterfactual Regret Minimization) algorithm. The algorithm iteratively
+approaches the Nash equilibrium with the regret matching and counterfactual value.
+And I used the following pesudo code to implement this algorithm[1].
+\begin{algorithm}
+    \caption{CFR Algorithm}\label{euclid}
+    \begin{algorithmic}[1]
+        \State  Initialize cumulative regret tables: $\forall I, r_I[a] \gets 0$
+        \State  Initialize cumulative strategy tables: $\forall I, s_I[a] \gets 0$
+        \State   Initialize initial profile: $\sigma^1(I,a) \gets 1/|A[I]|$
+        \Function{CFR}{$h, i, t, \pi_1, \pi_2$}
+        \If{h is terminal}
+            \State \Return $u_i(h)$
+        \ElsIf{h is a chance node}
+            \State \textit{Sample a single outcome a $\sim$ $\sigma_c$(h, a)}
+            \State \Return CFR$(ha, i, t, \pi_1, \pi_2)$
+        \EndIf
+        \State \textit{Let I be the information set containing h.}
+        \State \textit{$v_\sigma \gets 0$}
+        \State \textit{$v_{\sigma_{I \rightarrow a}}[a] \gets 0$ for all $a \in A(I)$}
+        \For{$a \in A(I)$}
+            \If{$P(h)=1$}
+            \State $v_{\sigma_{I \rightarrow a}}[a] \gets $ CFR$(ha, i, t, \sigma^t(I, a) \cdot \pi_1, \pi_2)$
+            \ElsIf{$P(h)=2$}
+            \State $v_{\sigma_{I \rightarrow a}}[a] \gets $ CFR$(ha, i, t, \pi_1, \sigma^t(I, a) \cdot \pi_2)$
+            \EndIf
+            \State \textit{$v_\sigma \gets v_\sigma + \sigma^t(I, a) \cdot v_{\sigma_{I \rightarrow a}}[a]$}
+        \EndFor
+        \If{$P(h)=i$}
+            \For{$a \in A(I)$}
+                \State $r_I[a] \gets r_I[a] + \pi_{-i} \cdot (v_{\sigma_{I \rightarrow a}}[a] - v_\sigma)$
+                \State $s_I[a] \gets s_I[a] + \pi_{i} \cdot \sigma^t(I, a)$
+            \EndFor
+            \State $\sigma^{t+1}(I) \gets \textit{regret-matching value}$
+        \EndIf
+        \State \Return $v_\sigma$
+        \EndFunction
+        \Function{Sovle}{ }
+        \For {$t=\{1,2,3,...,T\}$}
+            \For {$i \in \{1,2\}$}
+                \State CFR$(\emptyset, i, t, 1, 1)$
+            \EndFor
+        \EndFor
+        \EndFunction
+    \end{algorithmic}
+\end{algorithm}
+% \newpage
+However, after 100000 iterations of training, I found this method is extremely time-consuming and space-consuming.
+Because I only collected about 1.2M information set after over 2 hours training process but the number of information set in No-Limit Texas Hold'em is up to $10^{162}$[2],
+which is nearly impossible for me to collect and store. And I think it's also the reason why many paper about poker use Leduc Hold'em to demostrate how power their algorithm is because
+the number of information set in Leduc Hold'em is only about 100[2]. As a result, I have to abandon this method although it's well-recognized the best algorithm so far when it comes to Texas Hold'em.
+
+\section*{2. Monte Carlo method}
+After the attempt above, I decided to use the basic Monte Carlo method[3] and some domain knowledge to implement a simple but still powerful enough agent to defeat public baseline ai first. 
+The Monte Carlo method is to randomly sample a large number of possible game results to approximate the real win rate. And I use the proximate win rate and opponent's action to
+make decision. The hyperparemeter in this agent is the number of times in simulation, and I choose 6000 because the more times we stimulate, the more precise win rate we can get
+(couldn't be more due to 5 seconds limitaion).
+\begin{algorithm}
+    \caption{MCM Algorithm}\label{euclid}
+    \begin{algorithmic}[1]
+        \Function{MCM}{$s, holeCard, communityCard$}
+            \State $\textit{initialize }w:w\gets 0$
+            \For{$i=\{1,2,3...s\}$}
+                \State $w \gets w + \text{monteCarloSimulation}(holeCard, communityCard)$
+            \EndFor
+            \State \Return $w/s$
+        \EndFunction
+        \Function{monteCarloSimulation}{$holeCard, communityCard$}
+        \State Initialize opponent's hold cards: $oppCard \gets$ fillCard($holeCard$)
+        \State Initialize community cards: $communityCard \gets$ fillCard($holeCard+oppCard$ + communityCard)
+        \State myScore $\gets$ evalHand($holeCard, communityCard$)
+        \State oppScore $\gets$ evalHand($oppCard, communityCard$)
+        \If {myScore $>$ oppScore}
+        \State \Return 1
+        \EndIf
+        \State \Return 0
+        \EndFunction
+    \end{algorithmic}
+\end{algorithm}
+After carefully finetuning, this agent can defeat baseline 0, 1, 2, 3, 5 and it have about 70\% win rates against baseline 4 in 20 rounds.
+However, if the agents compete in 200 rounds, this agent can always win. In my opinion, it's because the factor of luck will be diminished when the length of competition
+becomes longer.
+
+\section*{3. Deep Q learning}
+The third method I have tried is deep Q learning(DQN)[4]. This reinforcement learning method is to use Q function as critic and we use deep learning and gradient descent to
+learn and optimize model(Q function). This model takes current state as input and the score of each possible action as output. The loss function I use is
+$MSE(Q(s_t, a_t),r_t+max_aQ(s_{t+1},a))$($Q(s_t,a_t)$ is the score of $a_t$ that Q function predict under $s_t$.)\\
+\\
+Moerover, I use replay buffer and epsilon greedy to further optimize the performance of DQN model. Replay buffer is to collect the data we collected from the interaction between
+model and environment in the past and when gradient descent, randomly sample the data in the replay buffer can help increase the diversity of training data and decrease
+the time spent in collecting data. Epsilon greedy is to let model attempt more possible action in early training stage, which is useful to converge the model.\\
+\\
+Last but not the least, the reward function I use is $R_t=\gamma^{(T-t)}r_t$, $r_t$ is the stack we get or loss in a single round, t is timestep the corresponding action made in,
+$R_t$ is the reward of the corresponding action and $\gamma$ is the decay rate.\\
+\\
+I have tried three kinds of different state. The first one is to use 52 binary input to represent our hole card and community card. However, with this state definition,
+the model is very hard to converge(the reason may be the rule of poker is to complex for model to learn by itself), so I decided to make use of the Monte Carlo method.
+The second state is to use the win rate predicted by Monte Carlo method. With sufficient training, this model can defeat baseline0 but still hard to compete with baseline4 and
+baseline5. The third state I use is combine win rate and our and opponent's last two actions. Nevertheless, the model's performance against baseline4 and baseline5 becomes
+worse than the last one. In my opinion, maybe is's because the state is to complex for the model to converge.\\
+\begin{figure}[h!]
+    \centering
+    \includegraphics*{3-1.drawio.png}
+    \caption{The architecture of model}
+    \label{fig:arch}
+\end{figure}
+\\
+Interestingly, I found all of these three model's strategy are very conservative. If the win rate is too low, they will choose to fold instantly. Even if the win rate is
+high enough to raise, they still choose to just call in order to prevent losing too much money.
+
+\section*{4. Conclusion}
+Drawing a comparison among these three method I have tried, the CFR algorithm is too time and spaec-consuming,
+the DQN is too hard to converge to an acceptable performance; hence, even though
+the Monte Carlo method + domain knowledge seems like too simple for Texas Hold'em, I still choose this one as the final submission.
+
+
+\newpage
+\section*{Reference}
+[1] \href{http://modelai.gettysburg.edu/2013/cfr/cfr.pdf}{Todd W. Neller, Marc Lanctot, An Introduction to Counterfactual Regret Minimization}
+\newline
+[2] \href{https://rlcard.org/#available-environments}{RL Card, available-environments}
+\newline
+[3] \href{https://ishikota.github.io/PyPokerEngine/tutorial/participate_in_the_game/}{PyPokerEngine}
+\newline
+[4] \href{https://www.youtube.com/watch?v=o_g9JUMw1Oc&list=PLJV_el3uVTsODxQFgzMzPLa16h6B8kWM_&index=4&ab_channel=Hung-yiLee}{Hung-yi Lee, DRL Lecture 3: Q-learning (Basic Idea)}
+\end{document}

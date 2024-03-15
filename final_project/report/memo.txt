@@ -1,0 +1,25 @@
+RL against random_ai:
+	winrate state
+	200 eposide
+	0.82, 637.76
+
+RL against baseline4_ai:
+	winrate state
+	high tendency to folding if winrate is low
+	about 50% win rate after full training (may because the action this model choose only depends on winrate
+	very time consuming training process because baseline4_ai takes lots of time to decide action
+	naive fully connected network architecture (1X16X16X3)
+
+
+action 0 for fold, 1 for call, 2 for raise, 3 for no action(mask)
+only raise in mininum amount(but baseline4_ai seems like to reraise and model will raise again because the winrate is almost the same to it
+
+possible new state design:
+winrate, (model's last action, model's last bet) * 2, (opp's last action, opp's last bet) * 2 
+(bet is measured with bet to init stack ratio)
+if no action or no bet, mark as 3 and 0
+change all input's domain into [0, 3]
+
+against random_ai:
+	600 eposide
+	0.75, 539.24
